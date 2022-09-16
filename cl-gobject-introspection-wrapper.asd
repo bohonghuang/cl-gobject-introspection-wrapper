@@ -12,7 +12,7 @@
                (:file "util")
                (:file "desc")
                (:file "macro"))
-  :depends-on (#:alexandria #:cl-gobject-introspection #:symbol-munger))
+  :depends-on (#:alexandria #:cl-gobject-introspection #:cl-ppcre))
 
 (uiop:register-image-dump-hook
  (lambda ()

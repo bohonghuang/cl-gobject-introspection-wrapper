@@ -25,6 +25,18 @@
 (defun quoted-name-symbol (name)
   (assoc-value *quoted-name-alist* name :test #'equal))
 
+(defun camel-case->lisp-name (phrase)
+  (string-right-trim "-" (nstring-upcase (cl-ppcre:regex-replace-all "((?<!\d)(\d+))|(([A-Z][a-z]+))|((?<![a-z])([a-z]+))|((?<![A-Z])(([A-Z](?![a-z]))+))" phrase "\\1\\3\\5\\7-"))))
+
+(defun camel-case->lisp-symbol (phrase)
+  (intern (string-upcase (camel-case->lisp-name phrase))))
+
+(defun underscores->lisp-name (phrase)
+  (substitute #\- #\_ phrase))
+
+(defun underscores->lisp-symbol (phrase)
+  (intern (string-upcase (underscores->lisp-name phrase))))
+
 (defun transform-method-desc (desc &optional (class *class*))
   (let* ((info (gir::info-of desc))
          (name (nstring-upcase (underscores->lisp-name (gir:info-get-name info))))

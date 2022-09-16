@@ -16,7 +16,7 @@
 ;;;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 (defpackage gobject-introspection-wrapper
-  (:use #:cl #:alexandria #:symbol-munger)
+  (:use #:cl #:alexandria)
   (:nicknames #:gir-wrapper)
   (:export #:*quoted-name-alist*
            #:*class*
