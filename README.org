@@ -21,12 +21,13 @@
                                                   (("Widget" . "is_sensitive") . widget-is-sensitive-p)
                                                   (("Widget" . "is_visible") . widget-is-visible-p))))
    #+END_SRC   
-* Name Conversion Rules
-| GIR definition                                | Lisp definition                           |
-|-----------------------------------------------+-------------------------------------------|
-| ~* set_bar(boolean)~ in class ~Foo~               | ~(defun (setf foo-bar-p) (value instance))~ |
-| ~* set_bar(*)~ in class ~Foo~                     | ~(defun (setf foo-bar) (value instance))~   |
-| ~* is_bar()~ or ~boolean get_bar()~ in class ~Foo~  | ~(defun foo-bar-p (instance))~              |
-| ~* get_bar()~ in class ~Foo~                      | ~(defun foo-bar (instance))~                |
-| ~* has_bar()~ in class ~Foo~                      | ~(defun foo-has-bar-p (instance))~          |
+* Conversion Rules
+| GIR definition                                                           | Lisp definition                           |
+|--------------------------------------------------------------------------+-------------------------------------------|
+| ~* set_bar(boolean)~ in class ~Foo~                                          | ~(defun (setf foo-bar-p) (value instance))~ |
+| ~* set_bar(*)~ in class ~Foo~                                                | ~(defun (setf foo-bar) (value instance))~   |
+| ~* is_bar()~ or ~boolean get_bar()~ in class ~Foo~                             | ~(defun foo-bar-p (instance))~              |
+| ~* get_bar()~ in class ~Foo~                                                 | ~(defun foo-bar (instance))~                |
+| ~* has_bar()~ in class ~Foo~                                                 | ~(defun foo-has-bar-p (instance))~          |
+| ~* new(* arg1, * arg2, ...)~ or ~* create(* arg1, * arg2, ...)~ in class ~Foo~ | ~(defun make-foo (&key arg1 arg2))~         |
 Note: ~*~ is a placeholder that stands for any type.
