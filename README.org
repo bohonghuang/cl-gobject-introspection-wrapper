@@ -1,0 +1,32 @@
+#+TITLE:  cl-gobject-introspection-wrapper
+
+* Usage
+1. Clone this repository into the folder local-projects under where your Quicklisp is installed and load the libray using ~(ql:quickload :cl-gobject-introspection-wrapper)~.
+2. Create a package to store the auto-generated symbols from GIR. To avoid potential symbol confliction, we define the package without using any package:
+   #+BEGIN_SRC lisp
+     (cl:defpackage gtk)
+   #+END_SRC
+3. Use ~gir-wrapper:define-gir-namespace~ to generate all definitions from the namespace:
+   #+BEGIN_SRC lisp
+     (gir-wrapper:define-gir-namespace "Gtk")
+   #+END_SRC
+   All the definitions will be exported automatically.
+4. If there exist symbol names not converted correctly or causing conflict according to [[Name Conversion Rules][Name Conversion Rules]], you can set up the special variable ~gir-wrapper:*quoted-name-alist*~ to specify the corresponding symbols of  the definition names.
+   For portability consideration, we set up the variable before ~gir-wrapper:define-gir-namespace~ instead of using the ~compiler-let~ in CLTL2:
+   #+BEGIN_SRC lisp
+     (cl:eval-when (:execute :compile-toplevel :load-toplevel)
+       (cl:setf gir-wrapper:*quoted-name-alist* '(("ATContext" . at-context)
+                                                  (("TextBuffer" . "get_insert") . text-buffer-get-insert)
+                                                  (("Gesture" . "group") . group-gestures)
+                                                  (("Widget" . "is_sensitive") . widget-is-sensitive-p)
+                                                  (("Widget" . "is_visible") . widget-is-visible-p))))
+   #+END_SRC   
+* Name Conversion Rules
+| GIR definition                                | Lisp definition                           |
+|-----------------------------------------------+-------------------------------------------|
+| ~* set_bar(boolean)~ in class ~Foo~               | ~(defun (setf foo-bar-p) (value instance))~ |
+| ~* set_bar(*)~ in class ~Foo~                     | ~(defun (setf foo-bar) (value instance))~   |
+| ~* is_bar()~ or ~boolean get_bar()~ in class ~Foo~  | ~(defun foo-bar-p (instance))~              |
+| ~* get_bar()~ in class ~Foo~                      | ~(defun foo-bar (instance))~                |
+| ~* has_bar()~ in class ~Foo~                      | ~(defun foo-has-bar-p (instance))~          |
+Note: ~*~ is a placeholder that stands for any type.
