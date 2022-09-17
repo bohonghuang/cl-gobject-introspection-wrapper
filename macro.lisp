@@ -34,8 +34,8 @@
          ,@constructors
          ,@methods
          ,@class-functions
-         ,(when-let ((definitions (append constructors methods class-functions)))
-            `(export '(,@(remove-if-not #'symbolp (mapcar #'second definitions)))))))))
+         ,(when-let ((symbols (remove-if-not #'symbolp (mapcar #'second (append constructors methods class-functions)))))
+            `(export ',symbols))))))
 
 (defmacro define-gir-constant (name &optional (namespace *namespace*))
   (let ((constant (transform-constant-desc name namespace)))
@@ -50,7 +50,7 @@
     (let ((members (mapcar #'transform-enum-desc (gir:values-of (gir:nget-desc (eval namespace) name)))))
       `(progn
          ,@members
-         ,(when members `(export '(,@(remove-if-not #'symbolp (mapcar #'second members)))))))))
+         ,(when members `(export ',(mapcar #'second members)))))))
 
 (defmacro define-gir-function (name &optional (namespace *namespace*))
   (let ((*namespace* namespace)
@@ -58,7 +58,8 @@
     (let ((function (transform-function-desc (gir:nget-desc (eval namespace) name))))
       `(progn
          ,function
-         ,(when function `(export ',(when (symbolp (second function)) (second function))))))))
+         ,(when (and function (symbolp (second function)))
+            `(export ',(second function)))))))
 
 (defmacro define-gir-namespace (name &optional version repository)
   (let ((*namespace* (gir:require-namespace name version))
