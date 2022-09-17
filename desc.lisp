@@ -91,7 +91,7 @@
           (values `(defun ,(intern (format nil "~A-~A" class-name name)) ,args ,body) nil))))))
 
 (defun merge-constructor-forms (forms descs subst-arg-names)
-  (let ((grouped nil))                  ; (alist symbol (alist list list)): ((name . (((&rest args) . (subst-name body)))))
+  (let ((grouped nil))
     (loop :for (defun-symbol name lambda-list body) :in forms
           :for desc :in descs
           :for subst-arg-name :in subst-arg-names
@@ -113,6 +113,7 @@
                                                   :into result
                                               :else
                                                 :sum 1 :into no-subst-name-count
+                                                :and :collect `(,args ,body) :into result
                                               :finally
                                                  (assert (<= no-subst-name-count 1))
                                                  (return result))
