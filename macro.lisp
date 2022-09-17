@@ -34,7 +34,8 @@
          ,@constructors
          ,@methods
          ,@class-functions
-         (export '(,@(remove-if-not #'symbolp (mapcar #'second (append constructors methods class-functions)))))))))
+         ,(when-let ((definitions (append constructors methods class-functions)))
+            `(export '(,@(remove-if-not #'symbolp (mapcar #'second definitions)))))))))
 
 (defmacro define-gir-constant (name &optional (namespace *namespace*))
   `(define-constant ,(or (quoted-name-symbol name)
