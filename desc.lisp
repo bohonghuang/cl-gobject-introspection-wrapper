@@ -17,10 +17,11 @@
 
 (in-package #:gir-wrapper)
 
-(eval-when (:execute :compile-toplevel :load-toplevel)
-  (defparameter *namespace* nil)
-  (defparameter *class* nil)
-  (defparameter *quoted-name-alist* nil))
+(defparameter *namespace* nil)
+
+(defparameter *class* nil)
+
+(defparameter *quoted-name-alist* nil)
 
 (defun quoted-name-symbol (name)
   (assoc-value *quoted-name-alist* name :test #'equal))
