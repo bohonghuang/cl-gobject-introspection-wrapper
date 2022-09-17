@@ -21,7 +21,12 @@
   (let ((desc (gir:nget-desc (eval namespace) name))
         (*namespace* namespace)
         (*class* name))
-    (let ((constructors (mapcar #'transform-constructor-desc (gir:list-constructors-desc desc)))
+    (let ((constructors (loop :for desc :in (gir:list-constructors-desc desc)
+                              :for (form subst-arg-name) := (multiple-value-list (transform-constructor-desc desc))
+                              :collect form :into forms
+                              :collect subst-arg-name :into subst-arg-names
+                              :collect desc :into descs
+                              :finally (return (merge-constructor-forms forms descs subst-arg-names))))
           (methods (mapcar #'transform-method-desc (gir:list-methods-desc desc)))
           (class-functions (when (typep desc 'gir:object-class)
                              (mapcar #'transform-class-function-desc (gir:list-class-functions-desc desc)))))

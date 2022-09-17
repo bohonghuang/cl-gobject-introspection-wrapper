@@ -11,7 +11,7 @@
      (gir-wrapper:define-gir-namespace "Gtk")
    #+END_SRC
    All the definitions will be exported automatically.
-4. If there exist symbol names not converted correctly or causing conflict according to [[Name Conversion Rules][Name Conversion Rules]], you can set up the special variable ~gir-wrapper:*quoted-name-alist*~ to specify the corresponding symbols of  the definition names.
+4. If there exist symbol names not converted correctly or causing conflict according to [[Conversion Rules][Conversion Rules]], you can set up the special variable ~gir-wrapper:*quoted-name-alist*~ to specify the corresponding symbols of  the definition names.
    For portability consideration, we set up the variable before ~gir-wrapper:define-gir-namespace~ instead of using the ~compiler-let~ in CLTL2:
    #+BEGIN_SRC lisp
      (cl:eval-when (:execute :compile-toplevel :load-toplevel)

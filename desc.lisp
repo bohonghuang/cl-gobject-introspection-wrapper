@@ -79,19 +79,69 @@
                        (gir::arguments-desc-of desc)))
          (class-name (or (quoted-name-symbol class)
                          (camel-case->lisp-symbol class))))
-    `(defun ,@(if-let ((name-symbol (quoted-name-symbol (cons class (gir:info-get-name info)))))
-                (list name-symbol args)
-                (cond
-                  ((uiop:string-prefix-p "NEW-" name)
-                   `(,(intern (format nil "MAKE-~A-~A" class-name (subseq name 4))) ,args))
-                  ((string-equal "NEW" name)
-                   `(,(intern (format nil "MAKE-~A" class-name)) (&key ,@args)))
-                  ((uiop:string-prefix-p "CREATE-" name)
-                   `(,(intern (format nil "MAKE-~A-~A" class-name (subseq name 6))) ,args))
-                  ((string-equal "CREATE" name)
-                   `(,(intern (format nil "MAKE-~A" class-name)) (&key ,@args)))
-                  (t `(,(intern (format nil "~A-~A" class-name name)) ,args))))
-         (gir:invoke (,namespace ,class ',symbol) ,@args))))
+    (let ((body `(gir:invoke (,namespace ,class ',symbol) ,@args)))
+      (if-let ((name-symbol (quoted-name-symbol (cons class (gir:info-get-name info)))))
+        (values `(defun ,name-symbol ,args ,body) nil)
+        (if-let ((method (ppcre:register-groups-bind (verb prep method) ("^(NEW|CREATE)(-WITH|-FROM|$)(-.+|$)" name)
+                           (declare (ignore verb))
+                           (list prep method))))
+          (values `(defun ,(intern (format nil "MAKE-~A" class-name)) (&key ,@args) ,body) (and method
+                                                                                                (every (compose #'plusp #'length) method)
+                                                                                                (mapcar (lambda (str) (subseq str 1)) method)))
+          (values `(defun ,(intern (format nil "~A-~A" class-name name)) ,args ,body) nil))))))
+
+(defun merge-constructor-forms (forms descs subst-arg-names)
+  (let ((grouped nil))                  ; (alist symbol (alist list list)): ((name . (((&rest args) . (subst-name body)))))
+    (loop :for (defun-symbol name lambda-list body) :in forms
+          :for desc :in descs
+          :for subst-arg-name :in subst-arg-names
+          :when (eq (car lambda-list) '&key)
+            :do (pop lambda-list)
+          :do (push (list desc subst-arg-name body)
+                    (assoc-value (assoc-value grouped name) lambda-list :test #'equal)))
+    (loop :with unmergeable-constructors
+          :for (name . arg-groups) :in grouped
+          :do (setf arg-groups
+                    (mapcan (lambda (arg-group)
+                              (destructuring-bind (args . bodies) arg-group
+                                (if (> (length bodies) 1)
+                                    (if (= (length args) 1)
+                                        (loop :for (desc subst-arg-name body) :in bodies
+                                              :if subst-arg-name
+                                                :collect (let ((subst-symbol (intern (second subst-arg-name))))
+                                                           `((,subst-symbol) (let ((,(first args) ,subst-symbol)) ,body)))
+                                                  :into result
+                                              :else
+                                                :sum 1 :into no-subst-name-count
+                                              :finally
+                                                 (assert (<= no-subst-name-count 1))
+                                                 (return result))
+                                        (loop :for (desc subst-arg-name body) :in bodies
+                                              :if subst-arg-name
+                                                :do (let ((*quoted-name-alist*
+                                                            (cons (let ((name (gir:info-get-name (gir::info-of desc))))
+                                                                    (cons (cons *class* name)
+                                                                          (intern (format nil "MAKE-~A-~A-~A"
+                                                                                          (camel-case->lisp-symbol *class*)
+                                                                                          (first subst-arg-name)
+                                                                                          (second subst-arg-name)))))
+                                                                  *quoted-name-alist*)))
+                                                      (push (transform-constructor-desc desc) unmergeable-constructors))
+                                              :else
+                                                :collect `(,args ,(third bodies))))
+                                    (mapcar (compose (lambda (body) `(,args ,body)) #'third) bodies))))
+                            (sort arg-groups #'> :key (compose #'length #'first))))
+          :collect `(defun ,name (&key ,@(mapcar (lambda (arg) `(,arg :unspecified))
+                                                 (remove-duplicates (loop :for (args body) :in arg-groups
+                                                                          :append args))))
+                      (cond
+                        ,@(mapcar (lambda (arg-group)
+                                    (destructuring-bind (args body) arg-group
+                                      `((not (or ,@(mapcar (lambda (arg) `(eql ,arg :unspecified)) args))) ,body)))
+                                  arg-groups)
+                        (t (error "Invalid arguments for constructor ~A" ',name))))
+            :into merged-constructors
+          :finally (return (nconc merged-constructors unmergeable-constructors)))))
 
 (defun transform-class-function-desc (desc &optional (namespace *namespace*) (class *class*))
   (let* ((info (gir::info-of desc))
