@@ -38,11 +38,11 @@
             `(export '(,@(remove-if-not #'symbolp (mapcar #'second definitions)))))))))
 
 (defmacro define-gir-constant (name &optional (namespace *namespace*))
-  `(define-constant ,(or (quoted-name-symbol name)
-                         (symbolicate '#:+ (underscores->lisp-symbol name) '#:+))
-       (handler-case (gir:nget ,namespace ,name)
-         (warning ()))
-     :test #'equal))
+  (let ((constant (transform-constant-desc name namespace)))
+    `(progn
+       ,constant
+       ,(when constant
+          `(export ',(second constant))))))
 
 (defmacro define-gir-enum (name &optional (namespace *namespace*))
   (let ((*namespace* namespace)
@@ -50,7 +50,7 @@
     (let ((members (mapcar #'transform-enum-desc (gir:values-of (gir:nget-desc (eval namespace) name)))))
       `(progn
          ,@members
-         (export '(,@(remove-if-not #'symbolp (mapcar #'second members))))))))
+         ,(when members `(export '(,@(remove-if-not #'symbolp (mapcar #'second members)))))))))
 
 (defmacro define-gir-function (name &optional (namespace *namespace*))
   (let ((*namespace* namespace)
@@ -58,7 +58,7 @@
     (let ((function (transform-function-desc (gir:nget-desc (eval namespace) name))))
       `(progn
          ,function
-         (export ',(when (symbolp (second function)) (second function)))))))
+         ,(when function `(export ',(when (symbolp (second function)) (second function))))))))
 
 (defmacro define-gir-namespace (name &optional version repository)
   (let ((*namespace* (gir:require-namespace name version))
