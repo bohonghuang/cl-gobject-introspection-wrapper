@@ -45,7 +45,7 @@
   (declare (ignore desc))
   (catch 'skip
     (let* ((class-symbol (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
-           (pred-symbol (symbolicate class-symbol '#:-p)))
+           (pred-symbol (symbolicate class-symbol (if (find #\- (symbol-name class-symbol)) '#:-p '#:p))))
       `((defun ,pred-symbol (instance)
           (class-instance-p instance (gir:nget ,namespace ,class)))
         (deftype ,class-symbol ()
@@ -55,7 +55,7 @@
   (declare (ignore desc))
   (catch 'skip
     (let* ((interface-symbol (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
-           (pred-symbol (symbolicate interface-symbol '#:-p)))
+           (pred-symbol (symbolicate interface-symbol (if (find #\- (symbol-name interface-symbol)) '#:-p '#:p))))
       `((defun ,pred-symbol (instance)
           (interface-instance-p instance (gir:nget ,namespace ,class)))
         (deftype ,interface-symbol ()
