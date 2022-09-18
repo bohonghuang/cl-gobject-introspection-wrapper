@@ -19,3 +19,25 @@
 
 (defmethod info-of ((desc callable-desc))
   (slot-value desc 'info))
+
+(in-package #:gir-wrapper)
+
+(defun subclassp (class-a class-b)
+  (loop :for class := class-a :then (gir:parent-of class)
+        :while class
+        :thereis (gir:info-equal (gir::info-of class) (gir::info-of class-b))))
+
+(defun class-instance-p (instance class)
+  (subclassp (typecase instance
+               (gir::object-instance (gir:gir-class-of instance))
+               (gir::struct-instance (gir::struct-class-of instance))
+               (t (return-from class-instance-p nil)))
+             class))
+
+(defun interface-instance-p (instance interface)
+  (loop :with interface-info := (gir::info-of interface)
+        :for info :in (gir::interface-infos-of (typecase instance
+                                                 (gir::object-instance (gir:gir-class-of instance))
+                                                 (gir::struct-instance (gir::struct-class-of instance))
+                                                 (t (return-from interface-instance-p nil))))
+        :thereis (gir:info-equal info interface-info)) )

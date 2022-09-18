@@ -41,7 +41,28 @@
 (defun underscores->lisp-symbol (phrase)
   (intern (string-upcase (underscores->lisp-name phrase))))
 
-(defun transform-method-desc (desc &optional (class *class*))
+(defun transform-class-desc (desc &optional (namespace *namespace*) (class *class*))
+  (declare (ignore desc))
+  (catch 'skip
+    (let* ((class-symbol (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
+           (pred-symbol (symbolicate class-symbol '#:-p)))
+      `((defun ,pred-symbol (instance)
+          (class-instance-p instance (gir:nget ,namespace ,class)))
+        (deftype ,class-symbol ()
+          '(satisfies ,pred-symbol))))))
+
+(defun transform-interface-desc (desc &optional (namespace *namespace*) (class *class*))
+  (declare (ignore desc))
+  (catch 'skip
+    (let* ((interface-symbol (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
+           (pred-symbol (symbolicate interface-symbol '#:-p)))
+      `((defun ,pred-symbol (instance)
+          (interface-instance-p instance (gir:nget ,namespace ,class)))
+        (deftype ,interface-symbol ()
+          '(satisfies ,pred-symbol))))))
+
+(defun transform-method-desc (desc &optional (namespace *namespace*) (class *class*))
+  (declare (ignore namespace))
   (catch 'skip
     (let* ((info (gir::info-of desc))
            (name (nstring-upcase (underscores->lisp-name (gir:info-get-name info))))

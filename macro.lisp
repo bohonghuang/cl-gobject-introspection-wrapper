@@ -21,7 +21,8 @@
   (let ((desc (gir:nget-desc (eval namespace) name))
         (*namespace* namespace)
         (*class* name))
-    (let ((constructors (loop :for desc :in (gir:list-constructors-desc desc)
+    (let ((class (transform-class-desc desc))
+          (constructors (loop :for desc :in (gir:list-constructors-desc desc)
                               :for (form subst-arg-name) := (multiple-value-list (transform-constructor-desc desc))
                               :collect form :into forms
                               :collect subst-arg-name :into subst-arg-names
@@ -31,10 +32,23 @@
           (class-functions (when (typep desc 'gir:object-class)
                              (mapcar #'transform-class-function-desc (gir:list-class-functions-desc desc)))))
       `(progn
+         ,@class
          ,@constructors
          ,@methods
          ,@class-functions
-         ,(when-let ((symbols (remove-if-not #'symbolp (mapcar #'second (append constructors methods class-functions)))))
+         ,(when-let ((symbols (remove-if-not #'symbolp (mapcar #'second (append class constructors methods class-functions)))))
+            `(export ',symbols))))))
+
+(defmacro define-gir-interface (name &optional (namespace *namespace*))
+  (let ((desc (gir:nget-desc (eval namespace) name))
+        (*namespace* namespace)
+        (*class* name))
+    (let ((interface (transform-interface-desc desc))
+          (methods (mapcar #'transform-method-desc (gir:list-methods-desc desc))))
+      `(progn
+         ,@interface
+         ,@methods
+         ,(when-let ((symbols (remove-if-not #'symbolp (mapcar #'second (append interface methods)))))
             `(export ',symbols))))))
 
 (defmacro define-gir-constant (name &optional (namespace *namespace*))
@@ -72,9 +86,11 @@
                          (type (gir:info-get-type info)))
                      (switch (type)
                        (:object `(define-gir-class ,name ,namespace-symbol))
-                       (:struct `(define-gir-class ,name ,namespace-symbol))
+                       (:struct (unless (ppcre:all-matches "Iface$" name)
+                                  `(define-gir-class ,name ,namespace-symbol)))
                        (:function `(define-gir-function ,name ,namespace-symbol))
                        (:constant `(define-gir-constant ,name ,namespace-symbol))
                        (:enum `(define-gir-enum ,name ,namespace-symbol))
-                       (:flags `(define-gir-enum ,name ,namespace-symbol)))))
+                       (:flags `(define-gir-enum ,name ,namespace-symbol))
+                       (:interface `(define-gir-interface ,name ,namespace-symbol)))))
                  (gir:repository-get-infos repository name)))))
