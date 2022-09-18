@@ -61,6 +61,28 @@
         (deftype ,interface-symbol ()
           '(satisfies ,pred-symbol))))))
 
+(defparameter +getter-pattern-1-base+ "(?:(.+?(?=\\bIS\\b))?(?:IS-)?(.+))") ; xxx_is_xxx, xxx
+
+(defparameter +getter-pattern-1+ (format nil "(?:(.*?(?=\\b(?:GET|IS)\\b))(?:GET-|IS-)~A)" +getter-pattern-1-base+)) ; get_xxx_is_xxx, get_xxx, is_xxx, get_is_xxx
+
+(defparameter +getter-pattern-2+ "(.*?(?=\\b(?:HAS|SHOULD)\\b)(?:HAS|SHOULD)-.+)") ; xxx_should_xxx, xxx_has_xxx, has_xxx, should_xxx
+
+(defparameter +getter-pattern+ (format nil "(?:~A|~A)" +getter-pattern-1+ +getter-pattern-2+))
+
+(defparameter +setter-pattern+ (format nil "(?:SET-(?:~A|~A))" +getter-pattern-1-base+ +getter-pattern-2+))
+
+(defun scan-to-string (regex target-string)
+  (multiple-value-bind (match-string groups) (ppcre:scan-to-strings regex target-string)
+    (when (and match-string (= (length match-string) (length target-string)))
+      (loop :with string := (make-string (loop :for group :across groups :summing (length group)))
+            :for i := 0 :then (+ i (length group))
+            :for group :across groups
+            :if group
+              :do (loop :for char :across group
+                        :for j :from 0
+                        :do (setf (aref string (+ i j)) char))
+            :finally (return string)))))
+
 (defun transform-method-desc (desc &optional (namespace *namespace*) (class *class*))
   (declare (ignore namespace))
   (catch 'skip
@@ -80,21 +102,13 @@
            (gir:invoke (instance ',symbol) ,@args))
         (cond
           ((and (not args)
-                (ppcre:register-groups-bind (name) ("^GET-(.+)$" name)
+                (when-let ((name (scan-to-string +getter-pattern+ name)))
                   `(defun ,(intern (format nil (if (eql ret-type 'boolean) "~A-~A-P" "~A-~A") class-name name)) (instance)
                      (gir:invoke (instance ',symbol))))))
           ((and args (not (cdr args))
-                (ppcre:register-groups-bind (name) ("^SET-(.+)$" name)
-                  `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-~A-P" "~A-~A") class-name name))) (value instance)
-                     (gir:invoke (instance ',symbol) value)))))
-          ((and (not args)
-                (ppcre:register-groups-bind (name) ("^IS-(.+)$" name)
-                  `(defun ,(intern (format nil "~A-~A-P" class-name name)) (instance)
-                     (gir:invoke (instance ',symbol))))))
-          ((and (not args)
-                (ppcre:register-groups-bind (name) ("^(HAS-.+)$" name)
-                  `(defun ,(intern (format nil "~A-~A-P" class-name name)) (instance)
-                     (gir:invoke (instance ',symbol))))))
+                (when-let ((name (scan-to-string +setter-pattern+ name)))
+                  `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-~A-P" "~A-~A") class-name name))) (,@args instance)
+                     (gir:invoke (instance ',symbol) ,@args)))))
           (t `(defun ,(intern (format nil "~A-~A" class-name name)) (instance ,@args)
                 (gir:invoke (instance ',symbol) ,@args))))))))
 
@@ -194,21 +208,13 @@
            (gir:invoke (,namespace ,class ',symbol) ,@args))
         (cond
           ((and (not args)
-                (ppcre:register-groups-bind (name) ("^GET-(.+)$" name)
+                (when-let ((name (scan-to-string +getter-pattern+ name)))
                   `(defun ,(intern (format nil (if (eql ret-type 'boolean) "~A-~A-P" "~A-~A") class-name name)) ()
                      (gir:invoke (,namespace ,class ',symbol))))))
           ((and args (not (cdr args))
-                (ppcre:register-groups-bind (name) ("^SET-(.+)$" name)
+                (when-let ((name (scan-to-string +setter-pattern+ name)))
                   `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-~A-P" "~A-~A") class-name name))) (value)
                      (gir:invoke (,namespace ,class ',symbol) value)))))
-          ((and (not args)
-                (ppcre:register-groups-bind (name) ("^IS-(.+)$" name)
-                  `(defun ,(intern (format nil "~A-~A-P" class-name name)) ()
-                     (gir:invoke (,namespace ,class ',symbol))))))
-          ((and (not args)
-                (ppcre:register-groups-bind (name) ("^(HAS-.+)$" name)
-                  `(defun ,(intern (format nil "~A-~A-P" class-name name)) ()
-                     (gir:invoke (,namespace ,class ',symbol))))))
           (t `(defun ,(intern (format nil "~A-~A" class-name name)) ,args
                 (gir:invoke (,namespace ,class ',symbol) ,@args))))))))
 
@@ -230,21 +236,13 @@
            (gir:invoke (,namespace ',symbol) ,@args))
         (cond
           ((and (not args)
-                (ppcre:register-groups-bind (name) ("^GET-(.+)$" name)
+                (when-let ((name (scan-to-string +getter-pattern+ name)))
                   `(defun ,(intern (format nil (if (eql ret-type 'boolean) "~A-P" "~A") name)) ()
                      (gir:invoke (,namespace ',symbol))))))
           ((and args (not (cdr args))
-                (ppcre:register-groups-bind (name) ("^SET-(.+)$" name)
+                (when-let ((name (scan-to-string +setter-pattern+ name)))
                   `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-P" "~A") name))) (value)
                      (gir:invoke (,namespace ',symbol) value)))))
-          ((and (not args)
-                (ppcre:register-groups-bind (name) ("^IS-(.+)$" name)
-                  `(defun ,(intern (format nil "~A-P" name)) ()
-                     (gir:invoke (,namespace ',symbol))))))
-          ((and (not args)
-                (ppcre:register-groups-bind (name) ("^(HAS-.+)$" name)
-                  `(defun ,(intern (format nil "~A-P" name)) ()
-                     (gir:invoke (,namespace ',symbol))))))
           (t `(defun ,(intern (format nil "~A" name)) ,args
                 (gir:invoke (,namespace ',symbol) ,@args))))))))
 
