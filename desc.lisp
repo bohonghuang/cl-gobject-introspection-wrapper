@@ -65,7 +65,7 @@
 
 (defparameter +getter-pattern-1+ (format nil "(?:(.*?(?=\\b(?:GET|IS)\\b))(?:GET-|IS-)~A)" +getter-pattern-1-base+)) ; get_xxx_is_xxx, get_xxx, is_xxx, get_is_xxx
 
-(defparameter +getter-pattern-2+ "(.*?(?=\\b(?:HAS|SHOULD)\\b)(?:HAS|SHOULD)-.+)") ; xxx_should_xxx, xxx_has_xxx, has_xxx, should_xxx
+(defparameter +getter-pattern-2+ "(.*?(?=\\b(?:HAS|SHOULD|CAN)\\b)(?:HAS|SHOULD|CAN)-.+)") ; xxx_should_xxx, xxx_has_xxx, has_xxx, should_xxx
 
 (defparameter +getter-pattern+ (format nil "(?:~A|~A)" +getter-pattern-1+ +getter-pattern-2+))
 
