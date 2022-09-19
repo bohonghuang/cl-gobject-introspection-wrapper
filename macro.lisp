@@ -17,6 +17,12 @@
 
 (in-package #:gir-wrapper)
 
+(defun defun-form->symbol (form)
+  (setf form (second form))
+  (etypecase form
+    (list (second form))
+    (symbol form)))
+
 (defmacro define-gir-class (name &optional (namespace *namespace*))
   (let ((desc (gir:nget-desc (eval namespace) name))
         (*namespace* namespace)
@@ -36,7 +42,7 @@
          ,@constructors
          ,@methods
          ,@class-functions
-         ,(when-let ((symbols (remove-if-not #'symbolp (mapcar #'second (append class constructors methods class-functions)))))
+         ,(when-let ((symbols (delete-if #'null (mapcar #'defun-form->symbol (append class constructors methods class-functions)))))
             `(export ',symbols))))))
 
 (defmacro define-gir-interface (name &optional (namespace *namespace*))
@@ -48,7 +54,7 @@
       `(progn
          ,@interface
          ,@methods
-         ,(when-let ((symbols (remove-if-not #'symbolp (mapcar #'second (append interface methods)))))
+         ,(when-let ((symbols (delete-if #'null (mapcar #'defun-form->symbol (append interface methods)))))
             `(export ',symbols))))))
 
 (defmacro define-gir-constant (name &optional (namespace *namespace*))
@@ -64,7 +70,7 @@
     (let ((members (mapcar #'transform-enum-desc (gir:values-of (gir:nget-desc (eval namespace) name)))))
       `(progn
          ,@members
-         ,(when members `(export ',(mapcar #'second members)))))))
+         ,(when members `(export ',(delete-if #'null (mapcar #'second members))))))))
 
 (defmacro define-gir-function (name &optional (namespace *namespace*))
   (let ((*namespace* namespace)
@@ -72,8 +78,8 @@
     (let ((function (transform-function-desc (gir:nget-desc (eval namespace) name))))
       `(progn
          ,function
-         ,(when (and function (symbolp (second function)))
-            `(export ',(second function)))))))
+         ,(when-let ((symbol (defun-form->symbol function)))
+            `(export ',symbol))))))
 
 (defmacro define-gir-namespace (name &optional version repository)
   (let ((*namespace* (gir:require-namespace name version))

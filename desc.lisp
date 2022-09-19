@@ -109,7 +109,7 @@
                 (when-let ((name (scan-to-string +setter-pattern+ name)))
                   `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-~A-P" "~A-~A") class-name name))) (value instance)
                      (,@(if (cdr args) `(destructuring-bind ,args value) `(symbol-macrolet ((,(car args) value))))
-                       (gir:invoke (instance ',symbol) ,@args))))))
+                      (gir:invoke (instance ',symbol) ,@args))))))
           (t `(defun ,(intern (format nil "~A-~A" class-name name)) (instance ,@args)
                 (gir:invoke (instance ',symbol) ,@args))))))))
 
