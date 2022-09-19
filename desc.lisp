@@ -105,10 +105,11 @@
                 (when-let ((name (scan-to-string +getter-pattern+ name)))
                   `(defun ,(intern (format nil (if (eql ret-type 'boolean) "~A-~A-P" "~A-~A") class-name name)) (instance)
                      (gir:invoke (instance ',symbol))))))
-          ((and args (not (cdr args))
+          ((and args
                 (when-let ((name (scan-to-string +setter-pattern+ name)))
-                  `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-~A-P" "~A-~A") class-name name))) (,@args instance)
-                     (gir:invoke (instance ',symbol) ,@args)))))
+                  `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-~A-P" "~A-~A") class-name name))) (value instance)
+                     (,@(if (cdr args) `(destructuring-bind ,args value) `(symbol-macrolet ((,(car args) value))))
+                       (gir:invoke (instance ',symbol) ,@args))))))
           (t `(defun ,(intern (format nil "~A-~A" class-name name)) (instance ,@args)
                 (gir:invoke (instance ',symbol) ,@args))))))))
 
@@ -211,10 +212,11 @@
                 (when-let ((name (scan-to-string +getter-pattern+ name)))
                   `(defun ,(intern (format nil (if (eql ret-type 'boolean) "~A-~A-P" "~A-~A") class-name name)) ()
                      (gir:invoke (,namespace ,class ',symbol))))))
-          ((and args (not (cdr args))
+          ((and args
                 (when-let ((name (scan-to-string +setter-pattern+ name)))
                   `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-~A-P" "~A-~A") class-name name))) (value)
-                     (gir:invoke (,namespace ,class ',symbol) value)))))
+                     (,@(if (cdr args) `(destructuring-bind ,args value) `(symbol-macrolet ((,(car args) value))))
+                      (gir:invoke (,namespace ,class ',symbol) ,@args))))))
           (t `(defun ,(intern (format nil "~A-~A" class-name name)) ,args
                 (gir:invoke (,namespace ,class ',symbol) ,@args))))))))
 
@@ -239,10 +241,11 @@
                 (when-let ((name (scan-to-string +getter-pattern+ name)))
                   `(defun ,(intern (format nil (if (eql ret-type 'boolean) "~A-P" "~A") name)) ()
                      (gir:invoke (,namespace ',symbol))))))
-          ((and args (not (cdr args))
+          ((and args
                 (when-let ((name (scan-to-string +setter-pattern+ name)))
                   `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-P" "~A") name))) (value)
-                     (gir:invoke (,namespace ',symbol) value)))))
+                     (,@(if (cdr args) `(destructuring-bind ,args value) `(symbol-macrolet ((,(car args) value))))
+                      (gir:invoke (,namespace ',symbol) ,@args))))))
           (t `(defun ,(intern (format nil "~A" name)) ,args
                 (gir:invoke (,namespace ',symbol) ,@args))))))))
 
