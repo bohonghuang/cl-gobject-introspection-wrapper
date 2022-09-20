@@ -1,33 +1,75 @@
 #+TITLE:  cl-gobject-introspection-wrapper
-
+This library converts the elements from GObject Introspection into Lisp-style definitions, based on [[https://github.com/andy128k/cl-gobject-introspection][cl-gobject-introspection]].
 * Usage
-1. Clone this repository into the folder local-projects under where your Quicklisp is installed and load the libray using ~(ql:quickload :cl-gobject-introspection-wrapper)~.
-2. Create a package to store the auto-generated symbols from GIR. To avoid potential symbol confliction, we define the package without using any package:
+It's very easy to create a binding to a new GObject-based library via ~cl-gobject-introspection-wrapper~:
+1. Clone this repository into the folder ~local-projects~ under your Quicklisp installation root, then load the library with ~(ql:quickload :cl-gobject-introspection-wrapper)~. 
+2. Create a package to store the auto-generated symbols from GIR. To avoid potential symbol conflicts,
+   we write the ~defpackage~ with an empty ~:use~ clause:
    #+BEGIN_SRC lisp
-     (cl:defpackage gtk)
+     (cl:defpackage gtk (:use))
    #+END_SRC
-3. Use ~gir-wrapper:define-gir-namespace~ to generate all definitions from the namespace:
+3. Use ~gir-wrapper:define-gir-namespace~ to generate all definitions from the GIR namespace:
    #+BEGIN_SRC lisp
      (gir-wrapper:define-gir-namespace "Gtk")
    #+END_SRC
-   All the definitions will be exported automatically.
-4. If there exist symbol names not converted correctly or causing conflict according to [[Conversion Rules][Conversion Rules]], you can set up the special variable ~gir-wrapper:*quoted-name-alist*~ to specify the corresponding symbols of  the definition names.
-   For portability consideration, we set up the variable before ~gir-wrapper:define-gir-namespace~ instead of using the ~compiler-let~ in CLTL2:
+   Note that all the definition symbols are exported automatically.
+4. If there exist some definitions whose name is not converted correctly or cause symbol conflicts according to [[Conversion Rules][Conversion Rules]],
+   you can set up the special variable ~gir-wrapper:*quoted-name-alist*~ to specify the corresponding symbol for a definition.
+   This could also exclude some definitions by specifying the symbols to ~cl:nil~ so that you can define them by hand later:
+   #+BEGIN_SRC lisp
+     (cltl2:compiler-let (gir-wrapper:*quoted-name-alist*
+                          '((("TextBuffer" . "get_insert") . text-buffer-get-insert) ; Specify a symbol for class method
+                            ("CSET_a_2_z" . +cset-a-z-lower-case+) ; Specify a symbol for function, constant, enumeration, class, interface, struct, or function argument.
+                            (("Widget" . "is_sensitive") . cl:nil) ; Exclude a class method.
+                            ("String" . cl:nil))) ; Exclude a function, constant, enumeration, class, struct, or interface.
+       (gir-wrapper:define-gir-namespace "Gtk" "4.0"))
+   #+END_SRC      
+   For portability consideration, we set the variable before ~gir-wrapper:define-gir-namespace~, then reset it after that,  to avoid using the ~compiler-let~ in CLTL2:
    #+BEGIN_SRC lisp
      (cl:eval-when (:execute :compile-toplevel :load-toplevel)
-       (cl:setf gir-wrapper:*quoted-name-alist* '(("ATContext" . at-context)
-                                                  (("TextBuffer" . "get_insert") . text-buffer-get-insert)
-                                                  (("Gesture" . "group") . group-gestures)
-                                                  (("Widget" . "is_sensitive") . widget-is-sensitive-p)
-                                                  (("Widget" . "is_visible") . widget-is-visible-p))))
+       (cl:setf gir-wrapper:*quoted-name-alist* '((("TextBuffer" . "get_insert") . text-buffer-get-insert)
+                                                  ("CSET_a_2_z" . +cset-a-z-lower-case+)
+                                                  (("Widget" . "is_sensitive") . cl:nil)
+                                                  ("Widget"))))
+
+     (gir-wrapper:define-gir-namespace "Gtk" "4.0")
+
+     (cl:eval-when (:execute :compile-toplevel :load-toplevel)
+       (cl:setf gir-wrapper:*quoted-name-alist* '()))
    #+END_SRC   
 * Conversion Rules
-| GIR definition                                                           | Lisp definition                           |
-|--------------------------------------------------------------------------+-------------------------------------------|
-| ~* set_bar(boolean)~ in class ~Foo~                                          | ~(defun (setf foo-bar-p) (value instance))~ |
-| ~* set_bar(*)~ in class ~Foo~                                                | ~(defun (setf foo-bar) (value instance))~   |
-| ~* is_bar()~ or ~boolean get_bar()~ in class ~Foo~                             | ~(defun foo-bar-p (instance))~              |
-| ~* get_bar()~ in class ~Foo~                                                 | ~(defun foo-bar (instance))~                |
-| ~* has_bar()~ in class ~Foo~                                                 | ~(defun foo-has-bar-p (instance))~          |
-| ~* new(* arg1, * arg2, ...)~ or ~* create(* arg1, * arg2, ...)~ in class ~Foo~ | ~(defun make-foo (&key arg1 arg2))~         |
-Note: ~*~ is a placeholder that stands for any type.
+In our rule definitions:
+- ~*~ is a placeholder that stands for any type.
+- ~[]~ denote an optional part of the name.
+- ~/~ splits multiple optional words.
+** Class
+| GIR definition | Lisp definition                                       |
+|----------------+-------------------------------------------------------|
+| ~Foo~            | ~(progn (defun foop (instance)) (deftype foo ()))~        |
+| ~FOOBar~         | ~(progn (defun foo-bar-p (instance)) (deftype foo-bar ()))~ |
+** Constructor
+| GIR definition                                                       | Lisp definition                       |
+|----------------------------------------------------------------------+---------------------------------------|
+| ~Foo new/create[_from_bar](* arg1, * arg2, ...)~                       | ~(defun make-foo (&key arg1 arg2 ...))~ |
+| ~Foo new/create_from_bar(* arg)~ if ~arg~ is used by another constructor | ~(defun make-foo (&key bar))~           |
+Note that the constructors with identical name after conversion will be merged into a single Lisp function,
+and which constructor to be called is determined by the arguments provided for this function.
+** Function/Method
+In class/interface/struct ~Foo~:
+| GIR definition                     | Lisp definition                                   |
+|------------------------------------+---------------------------------------------------|
+| ~void set_bar(*)~                    | ~(defun (setf foo-bar) (value instance))~           |
+| ~* get_bar()~                        | ~(defun foo-bar (instance)))~                       |
+| ~* set_bar[_is_baz](boolean)~        | ~(defun (setf foo-bar[-baz]-p) (value instance))~   |
+| ~boolean [bar_]is_baz()~             | ~(defun foo[-bar]-baz-p (instance))~                |
+| ~boolean get[_bar_is]_baz()~         | ~(defun foo[-bar]-baz-p (instance))~                |
+| ~boolean [bar_]has/should/can_baz()~ | ~(defun foo-[bar-]has/should/can-baz-p (instance))~ |
+| ~* bar(* arg1, * arg2, ...)~         | ~(defun foo-bar (instance arg1 arg2 ...))~          |
+** Constant
+| GIR definition | Lisp definition                                          |
+|----------------+----------------------------------------------------------|
+| ~FOO_BAR = 123~  | ~(alexandria:define-constant +​foo-bar​+ 123 :test #'equal)~ |
+** Enumeration
+| GIR definition        | Lisp definition                                                 |
+|-----------------------+-----------------------------------------------------------------|
+| ~Foo { Bar, Baz, ... }~ | ~(progn (defconstant +​foo-bar​+ 0) (defconstant +​foo-baz​+ 1) ...)~ |
