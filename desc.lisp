@@ -71,6 +71,8 @@
 
 (defparameter +setter-pattern+ (format nil "(?:SET-(?:~A|~A))" +getter-pattern-1-base+ +getter-pattern-2+))
 
+(defparameter +constructor-pattern+ "^(NEW|CREATE)(-WITH|-FROM|-FOR|$)(-.+|$)")
+
 (defun scan-to-string (regex target-string)
   (multiple-value-bind (match-string groups) (ppcre:scan-to-strings regex target-string)
     (when (and match-string (= (length match-string) (length target-string)))
@@ -128,7 +130,7 @@
       (let ((body `(gir:invoke (,namespace ,class ',symbol) ,@args)))
         (if-let ((name-symbol (quoted-name-symbol (cons class (gir:info-get-name info)))))
           (values `(defun ,name-symbol ,args ,body) nil)
-          (if-let ((method (ppcre:register-groups-bind (verb prep method) ("^(NEW|CREATE)(-WITH|-FROM|$)(-.+|$)" name)
+          (if-let ((method (ppcre:register-groups-bind (verb prep method) (+constructor-pattern+ name)
                              (declare (ignore verb))
                              (list prep method))))
             (values `(defun ,(intern (format nil "MAKE-~A" class-name)) (&key ,@args) ,body) (and method

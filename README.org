@@ -48,10 +48,10 @@ In our rule definitions:
 | ~Foo~            | ~(progn (defun foop (instance)) (deftype foo ()))~        |
 | ~FOOBar~         | ~(progn (defun foo-bar-p (instance)) (deftype foo-bar ()))~ |
 ** Constructor
-| GIR definition                                                       | Lisp definition                       |
-|----------------------------------------------------------------------+---------------------------------------|
-| ~Foo new/create[_from_bar](* arg1, * arg2, ...)~                       | ~(defun make-foo (&key arg1 arg2 ...))~ |
-| ~Foo new/create_from_bar(* arg)~ if ~arg~ is used by another constructor | ~(defun make-foo (&key bar))~           |
+| GIR definition                                                                | Lisp definition                       |
+|-------------------------------------------------------------------------------+---------------------------------------|
+| ~Foo new/create[_from/for/with_bar](* arg1, * arg2, ...)~                       | ~(defun make-foo (&key arg1 arg2 ...))~ |
+| ~Foo new/create_from/for/with_bar(* arg)~ if ~arg~ is used by another constructor | ~(defun make-foo (&key bar))~           |
 Note that the constructors with identical name after conversion will be merged into a single Lisp function,
 and which constructor to be called is determined by the arguments provided for this function.
 ** Function/Method
