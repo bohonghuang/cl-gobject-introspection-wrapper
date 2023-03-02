@@ -1,6 +1,6 @@
 ;;;; macro.lisp
 
-;;;; Copyright (C) 2022 Bohong Huang
+;;;; Copyright (C) 2022-2023 Bohong Huang
 ;;;;
 ;;;; This program is free software: you can redistribute it and/or modify
 ;;;; it under the terms of the GNU Lesser General Public License as published by
@@ -24,19 +24,34 @@
     (symbol form)))
 
 (defmacro define-gir-class (name &optional (namespace *namespace*))
-  (let ((desc (gir:nget-desc (eval namespace) name))
+  (let ((class-desc (gir:nget-desc (eval namespace) name))
         (*namespace* namespace)
         (*class* name))
-    (let ((class (transform-class-desc desc))
-          (constructors (loop :for desc :in (gir:list-constructors-desc desc)
+    (let ((class (transform-class-desc class-desc))
+          (constructors (loop :for desc :in (gir:list-constructors-desc class-desc)
                               :for (form subst-arg-name) := (multiple-value-list (transform-constructor-desc desc))
                               :collect form :into forms
                               :collect subst-arg-name :into subst-arg-names
                               :collect desc :into descs
-                              :finally (return (merge-constructor-forms forms descs subst-arg-names))))
-          (methods (mapcar #'transform-method-desc (gir:list-methods-desc desc)))
-          (class-functions (when (typep desc 'gir:object-class)
-                             (mapcar #'transform-class-function-desc (gir:list-class-functions-desc desc)))))
+                              :finally (return (multiple-value-bind (merged-constructors unmergeable-constructors)
+                                                   (merge-constructor-forms forms descs subst-arg-names)
+                                                 (setf merged-constructors
+                                                       (mapcar (lambda (constructor)
+                                                                 `(,(first constructor)
+                                                                   ,(second constructor)
+                                                                   ,(append (third constructor) '((pointer :unspecified)))
+                                                                   (if (eql pointer :unspecified)
+                                                                       (progn ,@(cdddr constructor))
+                                                                       (make-instance ',(etypecase class-desc
+                                                                                          (gir::object-class 'gir::object-instance)
+                                                                                          (gir::struct-class 'gir::struct-instance))
+                                                                                      :class (gir:nget ,namespace ,name)
+                                                                                      :this pointer))))
+                                                               merged-constructors))
+                                                 (nconc merged-constructors unmergeable-constructors)))))
+          (methods (mapcar #'transform-method-desc (gir:list-methods-desc class-desc)))
+          (class-functions (when (typep class-desc 'gir:object-class)
+                             (mapcar #'transform-class-function-desc (gir:list-class-functions-desc class-desc)))))
       `(progn
          ,@class
          ,@constructors

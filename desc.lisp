@@ -1,6 +1,6 @@
 ;;;; desc.lisp
 
-;;;; Copyright (C) 2022 Bohong Huang
+;;;; Copyright (C) 2022-2023 Bohong Huang
 ;;;;
 ;;;; This program is free software: you can redistribute it and/or modify
 ;;;; it under the terms of the GNU Lesser General Public License as published by
@@ -160,7 +160,7 @@
                                                            `((,subst-symbol) (let ((,(first args) ,subst-symbol)) ,body)))
                                                   :into result
                                               :else
-                                                :sum 1 :into no-subst-name-count
+                                                :count t :into no-subst-name-count
                                                 :and :collect `(,args ,body) :into result
                                               :finally
                                                  (assert (<= no-subst-name-count 1))
@@ -190,7 +190,7 @@
                                   arg-groups)
                         (t (error "Invalid arguments for constructor ~A" ',name))))
             :into merged-constructors
-          :finally (return (nconc merged-constructors unmergeable-constructors)))))
+          :finally (return (values merged-constructors unmergeable-constructors)))))
 
 (defun transform-class-function-desc (desc &optional (namespace *namespace*) (class *class*))
   (catch 'skip
