@@ -25,4 +25,6 @@
            #:define-gir-namespace
            #:define-gir-constant
            #:define-gir-enum
-           #:define-gir-function))
+           #:define-gir-function
+           #:pointer-object
+           #:object-pointer))

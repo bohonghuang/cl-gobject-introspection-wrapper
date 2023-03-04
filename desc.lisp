@@ -42,14 +42,20 @@
   (intern (string-upcase (underscores->lisp-name phrase))))
 
 (defun transform-class-desc (desc &optional (namespace *namespace*) (class *class*))
-  (declare (ignore desc))
   (catch 'skip
     (let* ((class-symbol (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
            (pred-symbol (symbolicate class-symbol (if (find #\- (symbol-name class-symbol)) '#:-p '#:p))))
       `((defun ,pred-symbol (instance)
           (class-instance-p instance (gir:nget ,namespace ,class)))
         (deftype ,class-symbol ()
-          '(satisfies ,pred-symbol))))))
+          '(satisfies ,pred-symbol))
+        (defmethod gir-wrapper:pointer-object (pointer (type (eql ',class-symbol)))
+          (declare (ignore type))
+          (make-instance ',(etypecase desc
+                             (gir::object-class 'gir::object-instance)
+                             (gir::struct-class 'gir::struct-instance))
+                         :class (gir:nget ,namespace ,class)
+                         :this pointer))))))
 
 (defun transform-interface-desc (desc &optional (namespace *namespace*) (class *class*))
   (declare (ignore desc))

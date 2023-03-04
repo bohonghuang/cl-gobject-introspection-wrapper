@@ -22,6 +22,12 @@
 
 (in-package #:gir-wrapper)
 
+(defgeneric pointer-object (pointer type)
+  (:documentation "Construct GObject from a CFFI pointer."))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (fdefinition 'object-pointer) (fdefinition 'gir::this-of)))
+
 (defun subclassp (class-a class-b)
   (loop :for class := class-a :then (gir:parent-of class)
         :while class
