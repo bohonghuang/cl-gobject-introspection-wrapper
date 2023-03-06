@@ -77,7 +77,7 @@
 
 (defparameter +setter-pattern+ (format nil "(?:SET-(?:~A|~A))" +getter-pattern-1-base+ +getter-pattern-2+))
 
-(defparameter +constructor-pattern+ "^(NEW|CREATE)(-WITH|-FROM|-FOR|$)(-.+|$)")
+(defparameter +constructor-pattern+ "^(NEW|CREATE)(-WITH|-FROM|-FOR|$)?(-.+|$)")
 
 (defun scan-to-string (regex target-string)
   (multiple-value-bind (match-string groups) (ppcre:scan-to-strings regex target-string)
@@ -138,10 +138,16 @@
           (values `(defun ,name-symbol ,args ,body) nil)
           (if-let ((method (ppcre:register-groups-bind (verb prep method) (+constructor-pattern+ name)
                              (declare (ignore verb))
-                             (list prep method))))
-            (values `(defun ,(intern (format nil "MAKE-~A" class-name)) (&key ,@args) ,body) (and method
-                                                                                                  (every (compose #'plusp #'length) method)
-                                                                                                  (mapcar (lambda (str) (subseq str 1)) method)))
+                             (if prep (list prep method) (list method)))))
+            (values `(defun ,(intern (format nil "MAKE~A-~A"
+                                             (ecase (length method)
+                                               (1 (first method))
+                                               (2 ""))
+                                             class-name))
+                         (&key ,@args) ,body)
+                    (and method
+                         (every (compose #'plusp #'length) method)
+                         (mapcar (lambda (str) (subseq str 1)) method)))
             (values `(defun ,(intern (format nil "~A-~A" class-name name)) ,args ,body) nil)))))))
 
 (defun merge-constructor-forms (forms descs subst-arg-names)
@@ -162,7 +168,7 @@
                                     (if (= (length args) 1)
                                         (loop :for (desc subst-arg-name body) :in bodies
                                               :if subst-arg-name
-                                                :collect (let ((subst-symbol (intern (second subst-arg-name))))
+                                                :collect (let ((subst-symbol (intern (lastcar subst-arg-name))))
                                                            `((,subst-symbol) (let ((,(first args) ,subst-symbol)) ,body)))
                                                   :into result
                                               :else
