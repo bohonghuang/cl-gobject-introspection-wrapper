@@ -105,6 +105,19 @@
            (arg-types (mapcar #'gir:type-desc-of (gir::arguments-desc-of desc)))
            (ret-types (mapcar #'gir:type-desc-of (gir::returns-desc-of desc)))
            (class-name (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
+           (proc-arg-fn (loop :for (arg-text arg-len) :on args ; (const char* text, int len, ...) -> (text ... &aux (len (length text)))
+                              :for (arg-text-type arg-len-type) :on arg-types
+                              :for i :from 0
+                              :when (and (eql arg-len-type 'integer)
+                                         (eql arg-text-type 'string)
+                                         (member (symbol-name arg-len) '("LENGTH" "LEN") :test #'string-equal))
+                                :return (lambda (args)
+                                          (loop :for arg :in args
+                                                :for j :from 0
+                                                :when (/= (1+ i) j)
+                                                  :collect arg :into result-args
+                                                :finally (return `(,@result-args &aux (,arg-len (length ,arg-text))))))
+                              :finally (return #'identity)))
            (proc-ret-fn (if (and (eq (car ret-types) :void) (cdr ret-types))
                             (lambda (body)
                               (let ((syms (loop :for tpe :in ret-types :collect (gensym))))
@@ -125,7 +138,7 @@
                   `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-~A-P" "~A-~A") class-name name))) (value instance)
                      (,@(if (cdr args) `(destructuring-bind ,args value) `(symbol-macrolet ((,(car args) value))))
                       ,(funcall proc-ret-fn `(gir:invoke (instance ',symbol) ,@args)))))))
-          (t `(defun ,(intern (format nil "~A-~A" class-name name)) (instance ,@args)
+          (t `(defun ,(intern (format nil "~A-~A" class-name name)) (instance ,@(funcall proc-arg-fn args))
                 ,(funcall proc-ret-fn `(gir:invoke (instance ',symbol) ,@args)))))))))
 
 (defun transform-constructor-desc (desc &optional (namespace *namespace*) (class *class*))
@@ -225,6 +238,19 @@
            (ret-types (mapcar #'gir:type-desc-of (gir::returns-desc-of desc)))
            (class-name (or (quoted-name-symbol class)
                            (camel-case->lisp-symbol class)))
+           (proc-arg-fn (loop :for (arg-text arg-len) :on args ; (const char* text, int len, ...) -> (text ... &aux (len (length text)))
+                              :for (arg-text-type arg-len-type) :on arg-types
+                              :for i :from 0
+                              :when (and (eql arg-len-type 'integer)
+                                         (eql arg-text-type 'string)
+                                         (member (symbol-name arg-len) '("LENGTH" "LEN") :test #'string-equal))
+                                :return (lambda (args)
+                                          (loop :for arg :in args
+                                                :for j :from 0
+                                                :when (/= (1+ i) j)
+                                                  :collect arg :into result-args
+                                                :finally (return `(,@result-args &aux (,arg-len (length ,arg-text))))))
+                              :finally (return #'identity)))
            (proc-ret-fn (if (and (eq (car ret-types) :void) (cdr ret-types))
                             (lambda (body)
                               (let ((syms (loop :for tpe :in ret-types :collect (gensym))))
@@ -245,7 +271,7 @@
                   `(defun (setf ,(intern (format nil (if (eql (car arg-types) 'boolean) "~A-~A-P" "~A-~A") class-name name))) (value)
                      (,@(if (cdr args) `(destructuring-bind ,args value) `(symbol-macrolet ((,(car args) value))))
                       ,(funcall proc-ret-fn `(gir:invoke (,namespace ,class ',symbol) ,@args)))))))
-          (t `(defun ,(intern (format nil "~A-~A" class-name name)) ,args
+          (t `(defun ,(intern (format nil "~A-~A" class-name name)) ,(funcall proc-arg-fn args)
                 ,(funcall proc-ret-fn `(gir:invoke (,namespace ,class ',symbol) ,@args)))))))))
 
 (defun transform-function-desc (desc &optional (namespace *namespace*) (class *class*))
