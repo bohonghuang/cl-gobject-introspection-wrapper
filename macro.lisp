@@ -54,7 +54,7 @@
       `(progn
          ,@interface
          ,@methods
-         ,(when-let ((symbols (delete-if #'null (mapcar #'defun-form->symbol (append interface methods)))))
+         ,(when-let ((symbols (delete-if #'null (mapcar #'defun-form->symbol (append (remove 'gir-wrapper:pointer-object interface :key #'second) methods)))))
             `(export ',symbols))))))
 
 (defmacro define-gir-constant (name &optional (namespace *namespace*))

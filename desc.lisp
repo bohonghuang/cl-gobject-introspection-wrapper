@@ -55,9 +55,12 @@
                 args (desc-args)))
         (values args)))))
 
+(defun gir-class-name->symbol (class)
+  (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
+
 (defun transform-class-desc (desc &optional (namespace *namespace*) (class *class*))
   (catch 'skip
-    (let* ((class-symbol (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
+    (let* ((class-symbol (gir-class-name->symbol class))
            (pred-symbol (symbolicate class-symbol (if (find #\- (symbol-name class-symbol)) '#:-p '#:p))))
       `((defun ,pred-symbol (instance)
           (class-instance-p instance (gir:nget ,namespace ,class)))
@@ -74,12 +77,15 @@
 (defun transform-interface-desc (desc &optional (namespace *namespace*) (class *class*))
   (declare (ignore desc))
   (catch 'skip
-    (let* ((interface-symbol (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
+    (let* ((interface-symbol (gir-class-name->symbol class))
            (pred-symbol (symbolicate interface-symbol (if (find #\- (symbol-name interface-symbol)) '#:-p '#:p))))
       `((defun ,pred-symbol (instance)
           (interface-instance-p instance (gir:nget ,namespace ,class)))
         (deftype ,interface-symbol ()
-          '(satisfies ,pred-symbol))))))
+          '(satisfies ,pred-symbol))
+        (defmethod gir-wrapper:pointer-object (pointer (type (eql ',interface-symbol)))
+          (declare (ignore type))
+          (make-instance 'gir::object-instance :class (gir:nget ,namespace ,class) :this pointer))))))
 
 (defparameter +getter-pattern-1-base+ "(?:(.+?(?=\\bIS\\b))?(?:IS-)?(.+))") ; xxx_is_xxx, xxx
 
@@ -114,7 +120,7 @@
            (args (callable-desc-argument-names desc))
            (arg-types (mapcar #'gir:type-desc-of (gir:arguments-desc-of desc)))
            (ret-types (mapcar #'gir:type-desc-of (gir:returns-desc-of desc)))
-           (class-name (or (quoted-name-symbol class) (camel-case->lisp-symbol class)))
+           (class-name (gir-class-name->symbol class))
            (proc-arg-fn (loop :for (arg-text arg-len) :on args ; (const char* text, int len, ...) -> (text ... &aux (len (length text)))
                               :for (arg-text-type arg-len-type) :on arg-types
                               :for i :from 0
